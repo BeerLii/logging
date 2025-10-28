@@ -1,0 +1,56 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+---
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: FluentdAgent
+metadata:
+  name: fluentd-agent
+  namespace: logging
+spec:
+  image: fluent/fluentd:v1.16-debian-1.0
+  positionDB:
+    hostPath:
+      path: /var/lib/fluentd-pos
+  volumes:
+    - name: varlog
+      hostPath:
+        path: /var/log
+  volumeMounts:
+    - name: varlog
+      mountPath: /var/log
+  daemonSet:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+---
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterInput
+metadata:
+  name: container-logs
+spec:
+  tail:
+    path: /var/log/containers/*.log
+    tag: kube.*
+    readFromHead: true
+---
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterFilter
+metadata:
+  name: kubernetes-meta
+spec:
+  match: kube.*
+  kubernetesMetadata:
+    mergeJSONLog: true
+---
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterOutput
+metadata:
+  name: stdout
+spec:
+  match: kube.*
+  stdout: {}
+

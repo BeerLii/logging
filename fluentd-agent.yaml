@@ -1,3 +1,21 @@
+   <source>
+      @type tail
+      @id in_tail_container_logs
+      path /var/log/containers/*.log
+      pos_file /fluentd/etc/pos/container.log.pos
+      tag kube.*
+      read_from_head true
+      refresh_interval 5
+      multiline_flush_interval 5
+      <parse>
+        @type json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+        keep_time_key true
+        emit_invalid_record_to_error true
+      </parse>
+    </source>
+    
     <filter kube.**>
       @type kubernetes_metadata
       @id filter_kube_metadata

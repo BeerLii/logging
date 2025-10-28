@@ -1,4 +1,43 @@
 apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterInput
+metadata:
+  name: container-logs
+  labels:
+    app: fluentd-agent
+spec:
+  tail:
+    path: /var/log/containers/*.log
+    tag: kube.*
+    readFromHead: true
+    posFile: /fluentd/etc/pos/container.log.pos
+    parser:
+      type: json
+      timeKey: time
+      timeFormat: "%Y-%m-%dT%H:%M:%S.%NZ"
+      timeType: string
+      emitInvalidRecordToError: true
+---
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterFilter
+metadata:
+  name: add-k8s-meta
+  labels:
+    app: fluentd-agent
+spec:
+  match: kube.*
+  filters:
+    - kubernetes_metadata:
+        kube_url: https://kubernetes.default.svc
+        cache_size: 1000
+        cache_ttl: 3600
+        watch: true
+        verify_ssl: false
+        use_journal: false
+        merge_json_log: true
+        labels: true
+        annotations: true
+
+apiVersion: fluentd.fluent.io/v1alpha1
 kind: Fluentd
 metadata:
   name: fluentd-agent

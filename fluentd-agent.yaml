@@ -1,3 +1,69 @@
+<source>
+  @type forward
+  tag app.logs
+</source>
+
+# Step 1: 复制事件流（两个方向）
+<match app.logs>
+  @type copy
+  <store>
+    @type relabel
+    @label @ERRORCHECK
+  </store>
+  <store>
+    @type relabel
+    @label @NORMAL
+  </store>
+</match>
+
+# Step 2: ERRORCHECK 流（只保留包含 keyword 的日志）
+<label @ERRORCHECK>
+  <filter **>
+    @type grep
+    <regexp>
+      key message
+      pattern /error/i
+    </regexp>
+  </filter>
+
+  # 匹配成功的打新 tag error.*
+  <match **>
+    @type relabel
+    @label @ERROR
+  </match>
+</label>
+
+# Step 3: ERROR 流（生成 metric + ES）
+<label @ERROR>
+  <filter **>
+    @type prometheus
+    <metric>
+      name log_error_total
+      type counter
+      desc "Count of error logs"
+      <labels>
+        level error
+      </labels>
+    </metric>
+  </filter>
+
+  <match **>
+    @type elasticsearch
+    host es.default.svc
+    index_name app-error
+  </match>
+</label>
+
+# Step 4: NORMAL 流（直接输出 ES，不生成 metric）
+<label @NORMAL>
+  <match **>
+    @type elasticsearch
+    host es.default.svc
+    index_name app-normal
+  </match>
+</label>
+
+
   <match **>
       @type rewrite_tag_filter
       <rule>

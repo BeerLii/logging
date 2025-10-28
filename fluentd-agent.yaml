@@ -1,3 +1,14 @@
+    <filter kube.**>
+      @type kubernetes_metadata
+      @id filter_kube_metadata
+      kubernetes_url https://kubernetes.default.svc
+      verify_ssl false
+      ca_file /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file /var/run/secrets/kubernetes.io/serviceaccount/token
+      merge_json_log true
+      labels true
+      annotations true
+    </filter>
 apiVersion: fluentd.fluent.io/v1alpha1
 kind: ClusterInput
 metadata:

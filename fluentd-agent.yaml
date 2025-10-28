@@ -1,3 +1,37 @@
+  <match **>
+      @type rewrite_tag_filter
+      <rule>
+        key message
+        pattern /error|exception|timeout/i
+        tag error.${tag}
+      </rule>
+      <rule>
+        key message
+        pattern /.*/
+        tag normal.${tag}
+      </rule>
+    </match>
+
+    ########################################################
+    # 4. 对匹配 error.** 的日志计数，生成 Prometheus 指标
+    ########################################################
+    <filter error.**>
+      @type prometheus
+      <metric>
+        name fluentd_error_logs_total
+        type counter
+        desc "Number of error logs detected by Fluentd"
+      </metric>
+      <labels>
+        namespace ${record["kubernetes"]["namespace_name"]}
+        pod ${record["kubernetes"]["pod_name"]}
+        container ${record["kubernetes"]["container_name"]}
+      </labels>
+    </filter>
+    <match **>
+      @type stdout
+    </match>
+   
    <source>
       @type tail
       @id in_tail_container_logs

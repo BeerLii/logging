@@ -4,16 +4,16 @@ kind: Namespace
 metadata:
   name: logging
 ---
+# Fluent Operator itself 已安装 CRDs 和 Controller
+# Agent 模式 Fluentd
 apiVersion: fluentd.fluent.io/v1alpha1
-kind: FluentdAgent
+kind: Fluentd
 metadata:
   name: fluentd-agent
   namespace: logging
 spec:
+  mode: Agent
   image: fluent/fluentd:v1.16-debian-1.0
-  positionDB:
-    hostPath:
-      path: /var/lib/fluentd-pos
   volumes:
     - name: varlog
       hostPath:
@@ -21,36 +21,73 @@ spec:
   volumeMounts:
     - name: varlog
       mountPath: /var/log
+  positionDB:
+    hostPath:
+      path: /var/lib/fluentd-pos
   daemonSet:
     resources:
       limits:
         cpu: 500m
         memory: 512Mi
 ---
+# Aggregator 模式 Fluentd
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: Fluentd
+metadata:
+  name: fluentd-aggregator
+  namespace: logging
+spec:
+  mode: Aggregator
+  image: fluent/fluentd:v1.16-debian-1.0
+  replicas: 1
+  service:
+    type: ClusterIP
+    ports:
+      - name: forward
+        port: 24224
+        targetPort: 24224
+---
+# Agent 收集容器日志
 apiVersion: fluentd.fluent.io/v1alpha1
 kind: ClusterInput
 metadata:
   name: container-logs
+  namespace: logging
 spec:
   tail:
     path: /var/log/containers/*.log
     tag: kube.*
     readFromHead: true
 ---
-apiVersion: fluentd.fluent.io/v1alpha1
-kind: ClusterFilter
-metadata:
-  name: kubernetes-meta
-spec:
-  match: kube.*
-  kubernetesMetadata:
-    mergeJSONLog: true
----
+# Agent 输出转发给 Aggregator
 apiVersion: fluentd.fluent.io/v1alpha1
 kind: ClusterOutput
 metadata:
-  name: stdout
+  name: forward-to-aggregator
+  namespace: logging
+spec:
+  match: kube.*
+  forward:
+    servers:
+      - host: fluentd-aggregator.logging.svc
+        port: 24224
+---
+# Aggregator 接收 Agent 转发日志
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterInput
+metadata:
+  name: forward-input
+  namespace: logging
+spec:
+  forward:
+    port: 24224
+---
+# Aggregator 输出到 stdout（可改为 Elasticsearch/Loki）
+apiVersion: fluentd.fluent.io/v1alpha1
+kind: ClusterOutput
+metadata:
+  name: stdout-output
+  namespace: logging
 spec:
   match: kube.*
   stdout: {}
-
